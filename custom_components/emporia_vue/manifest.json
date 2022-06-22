@@ -2,13 +2,13 @@
   "domain": "emporia_vue",
   "name": "Emporia Vue",
   "config_flow": true,
-  "documentation": "https://github.com/magico13/ha-emporia-vue",
+  "documentation": "https://github.com/devi19841006/ha-emporia-vue",
   "requirements": ["pyemvue==0.15.1"],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},
   "dependencies": [],
-  "codeowners": ["@magico13"],
+  "codeowners": ["@devi19841006"],
   "iot_class": "cloud_polling",
-  "version": "0.7.3"
+  "version": "0.7.4"
 }
