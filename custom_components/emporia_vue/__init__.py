@@ -159,7 +159,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 _LOGGER.info("Integrating minute data into day sensors")
                 if last_minute_data:
                     for identifier, data in last_minute_data.items():
-                        day_id = identifier.rsplit("-", 1)[0] + "-" + Scale.DAY.value
+                        device_gid, channel_gid, _ = identifier.split("-")
+                        day_id = f"{device_gid}-{channel_gid}-{Scale.DAY.value}"
                         if (
                             data
                             and last_day_data
@@ -168,6 +169,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                             and "usage" in last_day_data[day_id]
                             and last_day_data[day_id]["usage"] is not None
                         ):
+                            # if we just passed midnight, then reset back to zero
+                            handle_midnight(now, int(device_gid), day_id)
+
                             last_day_data[day_id]["usage"] += data[
                                 "usage"
                             ]  # already in kwh
@@ -211,7 +215,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 update_interval=timedelta(hours=1),
             )
             await coordinator_1hr.async_config_entry_first_refresh()
-            _LOGGER.info(f"1hr Update data: {coordinator_1hr.data}")
+            _LOGGER.info("1hr Update data: %s", coordinator_1hr.data)
 
         coordinator_day_sensor = None
         if ENABLE_1D not in entry_data or entry_data[ENABLE_1D]:
@@ -308,7 +312,7 @@ def recurse_usage_data(usage_devices, scale, data):
             if scale in [Scale.DAY.value, Scale.MONTH.value]:
                 # We need to know when the value reset
                 # For day, that should be midnight local time, but we need to use the timestamp returned to us
-                # for month, that should be midnight of the reset day they specify in the app (but could we keep resetting daily?)
+                # for month, that should be midnight of the reset day they specify in the app
 
                 # in either case, convert the given timestamp to local time first
 
@@ -317,9 +321,21 @@ def recurse_usage_data(usage_devices, scale, data):
                 reset_datetime = local_time.replace(
                     hour=0, minute=0, second=0, microsecond=0
                 )
-                _LOGGER.info(
-                    "Reset time for %s is %s", identifier, reset_datetime.isoformat()
-                )
+                if scale is Scale.MONTH.value:
+                    # Month should use the last billing_cycle_start_day of either this or last month
+                    reset_day = info.billing_cycle_start_day
+                    if reset_datetime.day >= reset_day:
+                        # we're past the reset day for this month, just set the day on the local time
+                        reset_datetime = reset_datetime.replace(day=reset_day)
+                    else:
+                        # we're in the start of a month, roll back to the reset_day of last month
+                        reset_datetime = reset_datetime.replace(
+                            day=reset_day
+                        ) - dateutil.relativedelta.relativedelta(months=1)
+
+                # _LOGGER.info(
+                #     "Reset time for %s is %s", identifier, reset_datetime.isoformat()
+                # )
 
             data[identifier] = {
                 "device_gid": gid,
@@ -390,3 +406,24 @@ def change_time_to_local(time: datetime, tz_string: str):
         # unaware, assume it's already utc
         time = time.replace(tzinfo=datetime.timezone.utc)
     return time.astimezone(tz_info)
+
+
+def handle_midnight(now: datetime, device_gid: int, day_id: str):
+    """If midnight has recently passed, reset the last_day_data for Day sensors to zero"""
+    global device_information
+    global last_day_data
+    if device_gid in device_information:
+        device_info = device_information[device_gid]
+        local_time = change_time_to_local(now, device_info.time_zone)
+        local_midnight = local_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        if (local_time - local_midnight) < timedelta(minutes=1, seconds=45):
+            # Midnight happened since the last update, reset to zero
+            _LOGGER.warning(
+                "Midnight happened recently for id %s! Current time is %s, midnight is %s",
+                day_id,
+                local_time,
+                local_midnight,
+            )
+            last_day_data[day_id]["usage"] = 0
+            last_day_data[day_id]["reset"] = local_midnight
+
