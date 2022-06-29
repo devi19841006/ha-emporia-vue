@@ -150,7 +150,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             global last_day_update
             global last_day_data
             now = datetime.now(timezone.utc)
-            if not last_day_update or (now - last_day_update) > timedelta(minutes=15):
+            if not last_day_update or (now - last_day_update) > timedelta(minutes=1):
                 _LOGGER.info("Updating day sensors")
                 last_day_update = now
                 last_day_data = await update_sensors(vue, [Scale.DAY.value])
@@ -416,7 +416,8 @@ def handle_midnight(now: datetime, device_gid: int, day_id: str):
         device_info = device_information[device_gid]
         local_time = change_time_to_local(now, device_info.time_zone)
         local_midnight = local_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        if (local_time - local_midnight) < timedelta(minutes=1, seconds=45):
+        #if (local_time - local_midnight) < timedelta(minutes=1, seconds=45):
+        if (local_time - local_midnight) < timedelta(minutes=1):
             # Midnight happened since the last update, reset to zero
             _LOGGER.warning(
                 "Midnight happened recently for id %s! Current time is %s, midnight is %s",
