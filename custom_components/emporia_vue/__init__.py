@@ -7,14 +7,16 @@ import logging
 from pyemvue import PyEmVue
 from pyemvue.device import VueDeviceChannel
 from pyemvue.enums import Scale
+import re
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, VUE_DATA, ENABLE_1S, ENABLE_1M, ENABLE_1D, ENABLE_1MON
@@ -150,7 +152,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             global last_day_update
             global last_day_data
             now = datetime.now(timezone.utc)
-            if not last_day_update or (now - last_day_update) > timedelta(minutes=1):
+            if not last_day_update or (now - last_day_update) > timedelta(minutes=15):
                 _LOGGER.info("Updating day sensors")
                 last_day_update = now
                 last_day_data = await update_sensors(vue, [Scale.DAY.value])
@@ -416,8 +418,7 @@ def handle_midnight(now: datetime, device_gid: int, day_id: str):
         device_info = device_information[device_gid]
         local_time = change_time_to_local(now, device_info.time_zone)
         local_midnight = local_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        #if (local_time - local_midnight) < timedelta(minutes=1, seconds=45):
-        if (local_time - local_midnight) < timedelta(minutes=1):
+        if (local_time - local_midnight) < timedelta(minutes=1, seconds=45):
             # Midnight happened since the last update, reset to zero
             _LOGGER.warning(
                 "Midnight happened recently for id %s! Current time is %s, midnight is %s",
@@ -427,4 +428,3 @@ def handle_midnight(now: datetime, device_gid: int, day_id: str):
             )
             last_day_data[day_id]["usage"] = 0
             last_day_data[day_id]["reset"] = local_midnight
-
