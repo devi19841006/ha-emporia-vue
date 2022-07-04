@@ -71,8 +71,8 @@ async def async_setup_entry(
     await coordinator.async_refresh()
 
     async_add_entities(
-        EmporiaOutletSwitch(coordinator, vue, id)
-        for idx, id in enumerate(coordinator.data)
+        EmporiaOutletSwitch(coordinator, vue, gid)
+        for idx, gid in enumerate(coordinator.data)
     )
 
 
