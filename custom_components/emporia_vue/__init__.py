@@ -119,7 +119,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             len(DEVICE_INFORMATION.keys()),
             total_channels,
         )
-?
+
 
         async def async_update_data_1sec():
             """Fetch data from API endpoint at a 1 second interval
