@@ -50,6 +50,7 @@ PLATFORMS = ["sensor", "switch"]
 
 DEVICE_GIDS: list[int] = []
 DEVICE_INFORMATION: dict[int, VueDevice] = {}
+LAST_SECOND_DATA: dict[str, Any] = {}
 LAST_MINUTE_DATA: dict[str, Any] = {}
 LAST_DAY_DATA: dict[str, Any] = {}
 LAST_DAY_UPDATE: datetime = None
@@ -118,6 +119,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             len(DEVICE_INFORMATION.keys()),
             total_channels,
         )
+?
+
+        async def async_update_data_1sec():
+            """Fetch data from API endpoint at a 1 second interval
+
+            This is the place to pre-process the data to lookup tables
+            so entities can quickly look up their data.
+            """
+            global last_second_data
+            data = await update_sensors(vue, [Scale.SECOND.value])
+            # store this, then have the daily sensors pull from it and integrate
+            # then the daily can "true up" hourly (or more frequent) in case it's incorrect
+            if data:
+                global LAST_SECOND_DATA
+                LAST_SECOND_DATA = data
+            return data
 
         async def async_update_data_1min():
             """Fetch data from API endpoint at a 1 minute interval
@@ -524,6 +541,12 @@ def determine_reset_datetime(
 
 def handle_none_usage(scale: str, identifier: str):
     """Handle the case of the usage being None by using the previous value or zero."""
+	if (
+        scale is Scale.SECOND.value
+        and identifier in LAST_SECOND_DATA
+        and "usage" in LAST_SECOND_DATA[identifier]
+    ):
+        return LAST_SECOND_DATA[identifier]["usage"]
     if (
         scale is Scale.MINUTE.value
         and identifier in LAST_MINUTE_DATA
