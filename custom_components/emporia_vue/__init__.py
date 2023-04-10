@@ -127,7 +127,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             This is the place to pre-process the data to lookup tables
             so entities can quickly look up their data.
             """
-            global last_second_data
             data = await update_sensors(vue, [Scale.SECOND.value])
             # store this, then have the daily sensors pull from it and integrate
             # then the daily can "true up" hourly (or more frequent) in case it's incorrect
