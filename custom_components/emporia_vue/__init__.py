@@ -49,7 +49,7 @@ PLATFORMS = ["sensor", "switch"]
 
 DEVICE_GIDS: list[int] = []
 DEVICE_INFORMATION: dict[int, VueDevice] = {}
-LAST_SEC_DATA: dict[str, Any] = {}
+LAST_SECOND_DATA: dict[str, Any] = {}
 LAST_MINUTE_DATA: dict[str, Any] = {}
 LAST_DAY_DATA: dict[str, Any] = {}
 LAST_DAY_UPDATE: datetime = None
@@ -180,14 +180,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
         coordinator_1sec = None
         if ENABLE_1MON not in entry_data or entry_data[ENABLE_1S]:
-            coordinator_1hr = DataUpdateCoordinator(
+            coordinator_1sec = DataUpdateCoordinator(
                 hass,
                 _LOGGER,
                 # Name of the data. For logging purposes.
                 name="sensor",
                 update_method=async_update_data_1sec,
                 # Polling interval. Will only be polled if there are subscribers.
-                update_interval=timedelta(second=2),
+                update_interval=timedelta(second=1),
             )
             await coordinator_1hr.async_config_entry_first_refresh()
             _LOGGER.info("1hr Update data: %s", coordinator_1hr.data)
@@ -516,12 +516,12 @@ def determine_reset_datetime(
 
 def handle_none_usage(scale: str, identifier: str):
     """Handle the case of the usage being None by using the previous value or zero."""
-	if (
+'''	if (
         scale is Scale.SECOND.value
         and identifier in LAST_SECOND_DATA
         and "usage" in LAST_SECOND_DATA[identifier]
     ):
-        return LAST_SECOND_DATA[identifier]["usage"]
+        return LAST_SECOND_DATA[identifier]["usage"]'''
     if (
         scale is Scale.MINUTE.value
         and identifier in LAST_MINUTE_DATA
