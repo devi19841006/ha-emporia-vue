@@ -26,7 +26,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, VUE_DATA, ENABLE_1S, ENABLE_1M, ENABLE_1D, ENABLE_1MON
+from .const import DOMAIN, VUE_DATA, ENABLE_1S, ENABLE_1M, ENABLE_1D
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -37,7 +37,6 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(ENABLE_1S, default=True): cv.boolean,
                 vol.Optional(ENABLE_1M, default=True): cv.boolean,
                 vol.Optional(ENABLE_1D, default=True): cv.boolean,
-                vol.Optional(ENABLE_1MON, default=True): cv.boolean,
             }
         )
     },
@@ -50,7 +49,7 @@ PLATFORMS = ["sensor", "switch"]
 
 DEVICE_GIDS: list[int] = []
 DEVICE_INFORMATION: dict[int, VueDevice] = {}
-LAST_SECOND_DATA: dict[str, Any] = {}
+LAST_SEC_DATA: dict[str, Any] = {}
 LAST_MINUTE_DATA: dict[str, Any] = {}
 LAST_DAY_DATA: dict[str, Any] = {}
 LAST_DAY_UPDATE: datetime = None
@@ -73,7 +72,6 @@ async def async_setup(hass: HomeAssistant, config: dict):
                 ENABLE_1S: conf[ENABLE_1S],
                 ENABLE_1M: conf[ENABLE_1M],
                 ENABLE_1D: conf[ENABLE_1D],
-                ENABLE_1MON: conf[ENABLE_1MON],
             },
         )
     )
@@ -148,14 +146,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 LAST_MINUTE_DATA = data
             return data
 
-        async def async_update_data_1hr():
-            """Fetch data from API endpoint at a 1 hour interval
-
-            This is the place to pre-process the data to lookup tables
-            so entities can quickly look up their data.
-            """
-            return await update_sensors(vue, [Scale.MONTH.value])
-
         async def async_update_day_sensors():
             global LAST_DAY_UPDATE
             global LAST_DAY_DATA
@@ -189,18 +179,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             return LAST_DAY_DATA
 
         coordinator_1sec = None
-        if ENABLE_1S not in entry_data or entry_data[ENABLE_1S]:
-            coordinator_1sec = DataUpdateCoordinator(
+        if ENABLE_1MON not in entry_data or entry_data[ENABLE_1S]:
+            coordinator_1hr = DataUpdateCoordinator(
                 hass,
                 _LOGGER,
                 # Name of the data. For logging purposes.
                 name="sensor",
                 update_method=async_update_data_1sec,
                 # Polling interval. Will only be polled if there are subscribers.
-                update_interval=timedelta(seconds=2),
+                update_interval=timedelta(second=2),
             )
-            await coordinator_1sec.async_config_entry_first_refresh()
-            _LOGGER.info("1sec Update data: %s", coordinator_1sec.data)
+            await coordinator_1hr.async_config_entry_first_refresh()
+            _LOGGER.info("1hr Update data: %s", coordinator_1hr.data)
+
         coordinator_1min = None
         if ENABLE_1M not in entry_data or entry_data[ENABLE_1M]:
             coordinator_1min = DataUpdateCoordinator(
@@ -214,19 +205,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             )
             await coordinator_1min.async_config_entry_first_refresh()
             _LOGGER.info("1min Update data: %s", coordinator_1min.data)
-        coordinator_1hr = None
-        if ENABLE_1MON not in entry_data or entry_data[ENABLE_1MON]:
-            coordinator_1hr = DataUpdateCoordinator(
-                hass,
-                _LOGGER,
-                # Name of the data. For logging purposes.
-                name="sensor",
-                update_method=async_update_data_1hr,
-                # Polling interval. Will only be polled if there are subscribers.
-                update_interval=timedelta(hours=1),
-            )
-            await coordinator_1hr.async_config_entry_first_refresh()
-            _LOGGER.info("1hr Update data: %s", coordinator_1hr.data)
 
         coordinator_day_sensor = None
         if ENABLE_1D not in entry_data or entry_data[ENABLE_1D]:
@@ -313,7 +291,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         VUE_DATA: vue,
         "coordinator_1sec": coordinator_1sec,
         "coordinator_1min": coordinator_1min,
-        "coordinator_1hr": coordinator_1hr,
         "coordinator_day_sensor": coordinator_day_sensor,
     }
 
