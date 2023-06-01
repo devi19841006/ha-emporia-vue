@@ -52,6 +52,7 @@ DEVICE_GIDS: list[int] = []
 DEVICE_INFORMATION: dict[int, VueDevice] = {}
 LAST_SECOND_DATA: dict[str, Any] = {}
 LAST_MINUTE_DATA: dict[str, Any] = {}
+LAST_HOUR_DATA: dict[str, Any] = {}
 LAST_DAY_DATA: dict[str, Any] = {}
 LAST_DAY_UPDATE: datetime = None
 
@@ -154,7 +155,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             This is the place to pre-process the data to lookup tables
             so entities can quickly look up their data.
             """
-            return await update_sensors(vue, [Scale.MONTH.value])
+            data = await update_sensors(vue, [Scale.HOUR.value])
+            # store this, then have the daily sensors pull from it and integrate
+            # then the daily can "true up" hourly (or more frequent) in case it's incorrect
+            if data:
+                global LAST_HOUR_DATA
+                LAST_HOUR_DATA = data
+            return data
 
         async def async_update_day_sensors():
             global LAST_DAY_UPDATE
@@ -197,7 +204,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 name="sensor",
                 update_method=async_update_data_1sec,
                 # Polling interval. Will only be polled if there are subscribers.
-                update_interval=timedelta(seconds=1),
+                update_interval=timedelta(seconds=2),
             )
             await coordinator_1sec.async_config_entry_first_refresh()
             _LOGGER.info("1sec Update data: %s", coordinator_1sec.data)
@@ -551,6 +558,12 @@ def handle_none_usage(scale: str, identifier: str):
         and "usage" in LAST_MINUTE_DATA[identifier]
     ):
         return LAST_MINUTE_DATA[identifier]["usage"]
+    if (
+        scale is Scale.HOUR.value
+        and identifier in LAST_HOUR_DATA
+        and "usage" in LAST_HOUR_DATA[identifier]
+    ):
+        return LAST_HOUR_DATA[identifier]["usage"]
     if (
         scale is Scale.DAY.value
         and identifier in LAST_DAY_DATA
