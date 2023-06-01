@@ -27,9 +27,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     coordinator_1sec = hass.data[DOMAIN][config_entry.entry_id]["coordinator_1sec"]
     coordinator_1min = hass.data[DOMAIN][config_entry.entry_id]["coordinator_1min"]
     coordinator_1hr = hass.data[DOMAIN][config_entry.entry_id]["coordinator_1hr"]
-    coordinator_day_sensor = hass.data[DOMAIN][config_entry.entry_id][
-        "coordinator_day_sensor"
-    ]
+    coordinator_day_sensor = hass.data[DOMAIN][config_entry.entry_id]["coordinator_day_sensor"]
 
     _LOGGER.info(hass.data[DOMAIN][config_entry.entry_id])
 
