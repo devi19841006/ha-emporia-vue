@@ -120,6 +120,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             total_channels,
         )
 
+        async def async_update_data_1sec():
+            """Fetch data from API endpoint at a 1 second interval
+
+            This is the place to pre-process the data to lookup tables
+            so entities can quickly look up their data.
+            """
+            data = await update_sensors(vue, [Scale.SECOND.value])
+            # store this, then have the daily sensors pull from it and integrate
+            # then the daily can "true up" hourly (or more frequent) in case it's incorrect
+            if data:
+                global LAST_SECOND_DATA
+                LAST_SECOND_DATA = data
+            return data
+
         async def async_update_data_1min():
             """Fetch data from API endpoint at a 1 minute interval
 
@@ -174,6 +188,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                             ]  # already in kwh
             return LAST_DAY_DATA
 
+        coordinator_1sec = None
+        if ENABLE_1S not in entry_data or entry_data[ENABLE_1S]:
+            coordinator_1sec = DataUpdateCoordinator(
+                hass,
+                _LOGGER,
+                # Name of the data. For logging purposes.
+                name="sensor",
+                update_method=async_update_data_1sec,
+                # Polling interval. Will only be polled if there are subscribers.
+                update_interval=timedelta(seconds=1),
+            )
+            await coordinator_1sec.async_config_entry_first_refresh()
+            _LOGGER.info("1sec Update data: %s", coordinator_1sec.data)
         coordinator_1min = None
         if ENABLE_1M not in entry_data or entry_data[ENABLE_1M]:
             coordinator_1min = DataUpdateCoordinator(
@@ -512,6 +539,12 @@ def determine_reset_datetime(
 
 def handle_none_usage(scale: str, identifier: str):
     """Handle the case of the usage being None by using the previous value or zero."""
+    if (
+        scale is Scale.SECOND.value
+        and identifier in LAST_SECOND_DATA
+        and "usage" in LAST_SECOND_DATA[identifier]
+    ):
+        return LAST_SECOND_DATA[identifier]["usage"]
     if (
         scale is Scale.MINUTE.value
         and identifier in LAST_MINUTE_DATA
